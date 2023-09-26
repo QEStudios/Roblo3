@@ -717,6 +717,72 @@ local function serviceResource(accessKeyId, secretAccessKey, region)
 			end
 		end
 
+        function ddbTable:BatchExecuteStatement(kwargs)
+			if self ~= ddbTable then error("`BatchExecuteStatement` must be called with `:`, not `.`", 2) end
+			if type(kwargs) ~= "table" then error("`kwargs` must be a table", 2) end
+			local ddbJson = {}
+			ddbJson["TableName"] = ddbTable.Name
+			ddbJson["Statements"] = kwargs["Statements"]
+			ddbJson["ReturnConsumedCapacity"] = kwargs["ReturnConsumedCapacity"] or "TOTAL"
+
+			local datestamp, amzdate = requestTime()
+
+			local method = "POST"
+			local query = {}
+			local payload = toJson(ddbJson)
+			local path = ""
+			local headers = {
+				["Host"] = "dynamodb."..ddb.region..".amazonaws.com",
+				["x-amz-date"] = amzdate,
+				["x-amz-target"] = "DynamoDB_20120810.ExecuteStatement",
+				["Content-Type"] = "application/x-amz-json-1.0"
+			}
+
+			local authItems = {
+				["method"] = method,
+				["algorithm"] = ddb.algorithm,
+				["datestamp"] = datestamp,
+				["amzdate"] = amzdate,
+				["region"] = ddb.region,
+				["service"] = ddb.service,
+				["secretAccessKey"] = secrets.secretAccessKey,
+				["accessKeyId"] = secrets.accessKeyId,
+				["payload"] = payload,
+				["path"] = path,
+				["headers"] = headers,
+				["query"] = query
+			}
+
+			local authHeader, canonicalQueryString = auth.formAuthenticationHeader(authItems)
+
+			headers["Authorization"] = authHeader
+			headers["Host"] = nil
+
+			local url = ddb.endpoint .. path
+			if canonicalQueryString ~= "" then url = url .. "?" .. canonicalQueryString end
+			local requestParams = {
+				["Url"] = url,
+				["Method"] = method,
+				["Headers"] = headers,
+				["Body"] = payload
+			}
+			local response = request(requestParams)
+			if response.Success then
+				local responseDataRaw = response.Response
+				local body = responseDataRaw.Body
+				local bodyData = toTable(body)
+				local responseData = {}
+                responseData["Responses"] = bodyData.Responses
+				if bodyData.ConsumedCapacity ~= nil then
+					responseData["ConsumedCapacity"] = bodyData.ConsumedCapacity
+				end
+				if responseData == {} then responseData = nil end
+				return responseData, bodyData, response
+			else
+				error(response.ErrorType..": "..response.ErrorMessage, 2)
+			end
+		end
+
 		return ddbTable
 	end
 
