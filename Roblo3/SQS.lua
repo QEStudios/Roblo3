@@ -42,3 +42,5 @@ local function serviceResource(accessKeyId, secretAccessKey, region)
 
     return sqs
 end
+
+return {}

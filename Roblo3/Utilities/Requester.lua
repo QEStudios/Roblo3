@@ -31,31 +31,48 @@ end
 local function toDdbJson(originalTable, storeTable, topLevel)
     if topLevel == nil then topLevel = true end
     for key, value in pairs(originalTable) do
-        local type = type(value)
-        if type == "table" and not topLevel then
-            storeTable[key] = {}
-            if #value == 0 then --convert to map
-                storeTable[key]["M"] = {}
-                toDdbJson(value, storeTable[key]["M"], false)
-            else --convert to list
-                storeTable[key]["L"] = {}
-                toDdbJson(value, storeTable[key]["L"], false)
+        if key == "NS" then
+            storeTable["NS"] = {}
+            for k,v in pairs(value) do
+                storeTable["NS"][k] = tostring(v)
             end
-        elseif type == "table" then
-            storeTable[key] = {}
-            toDdbJson(value, storeTable[key], false)
-        elseif type == "string" then
-            storeTable[key] = {
-                ["S"] = value
-            }
-        elseif type == "boolean" then
-            storeTable[key] = {
-                ["BOOL"] = tostring(value)
-            }
-        elseif type == "number" then
-            storeTable[key] = {
-                ["N"] = tostring(value)
-            }
+        elseif key == "SS" then
+            storeTable["SS"] = {}
+            for k,v in pairs(value) do
+                storeTable["SS"][k] = tostring(v)
+            end
+        elseif key == "BS" then
+            storeTable["BS"] = {}
+            for k,v in pairs(value) do
+                storeTable["BS"][k] = tostring(v)
+            end
+        else
+            local type = type(value)
+            if type == "table" and not topLevel and value["NS"] == nil and value["SS"] == nil and value["BS"] == nil then
+                storeTable[key] = {}
+                if #value == 0 then --convert to map
+                    storeTable[key]["M"] = {}
+                    toDdbJson(value, storeTable[key]["M"], false)
+                else --convert to list
+                    storeTable[key]["L"] = {}
+                    toDdbJson(value, storeTable[key]["L"], false)
+                end
+            elseif type == "table" then
+                storeTable[key] = {}
+                toDdbJson(value, storeTable[key], false)
+            elseif type == "string" then
+                storeTable[key] = {
+                    ["S"] = value
+                }
+            elseif type == "boolean" then
+                storeTable[key] = {
+                    ["BOOL"] = tostring(value)
+                }
+            elseif type == "number" then
+                storeTable[key] = {
+                    ["N"] = tostring(value)
+                }
+            end
         end
     end
 end
@@ -68,6 +85,18 @@ local function fromDdbJson(ddbJson, storeTable)
                 fromDdbJson(v, storeTable[key])
             elseif k == "L" then
                 fromDdbJson(v, storeTable[key])
+            elseif k == "NS" then
+                for k2,v2 in pairs(v) do
+                    storeTable[key][k2] = tonumber(v2)
+                end
+            elseif k == "SS" then
+                for k2,v2 in pairs(v) do
+                    storeTable[key][k2] = tostring(v2)
+                end
+            elseif k == "BS" then
+                for k2,v2 in pairs(v) do
+                    storeTable[key][k2] = v2
+                end
             elseif k == "S" then
                 storeTable[key] = tostring(v)
             elseif k == "N" then
